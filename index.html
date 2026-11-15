@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="theme-color" content="#14201a">
+<title>Nisselunden</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #14201a; color: #f1ece0;
+    font: 17px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .side { max-width: 560px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 26px; margin: 8px 0 4px; }
+  h2 { font-size: 18px; margin: 24px 0 8px; }
+  p { margin: 8px 0; }
+  .svag { color: #a9b5a7; font-size: 15px; }
+  button {
+    font: inherit; color: #fff; background: #b3261e; border: 0;
+    border-radius: 10px; padding: 12px 16px; min-height: 48px;
+  }
+  button.sekundaer { background: #2c4034; }
+  button:disabled { opacity: .5; }
+  #startknap { display: block; width: 100%; font-size: 24px; padding: 28px 16px; margin: 24px 0; }
+  #fejl { color: #ffb4a9; }
+
+  #status {
+    border-radius: 10px; padding: 12px 14px; margin: 12px 0;
+    font-weight: 600; background: #2c4034;
+  }
+  #status.spiller { background: #b3261e; }
+  #status.pause { background: #6b5a1e; }
+  #status.moerkt, #status.fejl { background: #45464a; }
+
+  #billede { position: relative; width: 100%; padding-bottom: 75%; background: #000; border-radius: 10px; overflow: hidden; }
+  #billede video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: fill; }
+  #gitter { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+  #gitter div {
+    float: left; width: 12.5%; height: 16.666%;
+    border: 1px solid rgba(255,255,255,.18);
+  }
+  #gitter div.fra { background: rgba(0,0,0,.72); }
+  #gitter div.varm { background: rgba(255,60,40,.45); }
+
+  #maaler { position: relative; height: 26px; background: #0c1410; border-radius: 6px; margin: 12px 0 4px; overflow: hidden; }
+  #niveau { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #4f9d69; }
+  #niveau.over { background: #e0483d; }
+  #graense { position: absolute; top: 0; bottom: 0; width: 3px; background: #fff; }
+
+  label { display: block; margin: 16px 0 4px; }
+  input[type=range] { width: 100%; height: 36px; margin: 0; }
+  .raekke { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .raekke button { flex: 1 1 140px; }
+  table { border-collapse: collapse; width: 100%; }
+  td { padding: 3px 0; vertical-align: top; }
+  td:last-child { text-align: right; }
+  #log { font: 13px/1.5 monospace; color: #a9b5a7; white-space: pre-wrap; max-height: 240px; overflow: auto; }
+
+  #sluk {
+    position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: #000;
+    color: #3a3a3a; font-size: 14px; text-align: center; padding-top: 45vh; z-index: 10;
+  }
+  #vaagen { position: fixed; width: 1px; height: 1px; opacity: .01; left: 0; bottom: 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="side" id="forside">
+  <h1>Nisselunden</h1>
+  <p class="svag">Bevægelsessensor med nissemusik</p>
+  <button id="startknap" disabled>Henter musik …</button>
+  <p id="fejl"></p>
+  <p class="svag">Tryk Start og giv siden lov til at bruge kameraet. Sæt telefonen i laderen, skru op for lyden og slå automatisk skærmlås fra.</p>
+</div>
+
+<div class="side" id="drift" hidden>
+  <div id="status">Starter …</div>
+
+  <div id="billede">
+    <video id="video" autoplay muted playsinline webkit-playsinline></video>
+    <div id="gitter"></div>
+  </div>
+  <p class="svag">Tryk på felter for at slå dem fra, fx blinkende lys eller vejen bagved. Røde felter viser, hvor der er bevægelse lige nu.</p>
+
+  <div id="maaler"><div id="niveau"></div><div id="graense"></div></div>
+  <p class="svag">Bevægelse nu: <span id="niveautal">0</span> % · den hvide streg er grænsen</p>
+
+  <label for="taerskel">Grænse for udløsning: <b id="taerskeltal"></b> % af billedet</label>
+  <input type="range" id="taerskel" min="0.5" max="30" step="0.5">
+
+  <label for="pause">Pause efter musikken: <b id="pausetal"></b> sek.</label>
+  <input type="range" id="pause" min="0" max="300" step="5">
+
+  <div class="raekke">
+    <button id="testknap" class="sekundaer">Prøv musikken</button>
+    <button id="kameraknap" class="sekundaer">Skift kamera</button>
+    <button id="slukknap" class="sekundaer">Sluk skærmbilledet</button>
+  </div>
+  <p class="svag">Skærmbilledet slukker selv efter to minutter uden berøring. Sensoren kører videre.</p>
+
+  <h2>Drift</h2>
+  <table>
+    <tr><td>Kørt siden start</td><td id="oppetid">–</td></tr>
+    <tr><td>Udløsninger siden start</td><td id="antal">0</td></tr>
+    <tr><td>Seneste udløsning</td><td id="seneste">–</td></tr>
+    <tr><td>Genstarter af kamera</td><td id="genstarter">0</td></tr>
+    <tr><td>Holder skærmen vågen med</td><td id="vaagenmaade">–</td></tr>
+    <tr><td>Virker uden internet</td><td id="offline">–</td></tr>
+  </table>
+
+  <h2>Log</h2>
+  <div id="log"></div>
+  <div class="raekke"><button id="rydlog" class="sekundaer">Ryd log</button></div>
+</div>
+
+<div id="sluk" hidden><span id="sluktekst"></span></div>
+<video id="vaagen" loop muted playsinline webkit-playsinline preload="auto" src="vaagen.mp4"></video>
+
+<script src="app.js"></script>
+</body>
+</html>
